@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>MangaGO - Gestão</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 500px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: auto; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #6200ee; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        button:hover { background: #3700b3; }
+        .btn-acao { padding: 5px 10px; margin-left: 5px; border-radius: 4px; border: none; cursor: pointer; color: white;}
+        .btn-editar { background: #f39c12; }
+        .btn-excluir { background: #e74c3c; }
+        ul { list-style: none; padding: 0; }
+        li { background: #eee; margin: 5px 0; padding: 10px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px;}
+        .busca-container { display: flex; gap: 10px; margin-bottom: 20px; background: #e0e0e0; padding: 10px; border-radius: 4px;}
+        .busca-container input { margin: 0; width: 70%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📚 MangaGO</h2>
+        
+        <div class="busca-container">
+            <input type="text" id="campoBusca" placeholder="Buscar por ID ou Nome...">
+            <button onclick="buscar()">Pesquisar</button>
+            <button onclick="listar()" style="background: #7f8c8d;">Limpar</button>
+        </div>
+
+        <h3 id="tituloForm">Novo Mangá</h3>
+        <input type="text" id="titulo" placeholder="Título do Mangá">
+        <input type="number" id="volume" placeholder="Volume">
+        <input type="text" id="editora" placeholder="Editora">
+        <button id="btnSalvar" onclick="salvarDados()">Cadastrar Mangá</button>
+
+        <h3>Sua Coleção</h3>
+        <ul id="lista"></ul>
+    </div>
+
+    <script>
+        let editandoId = null; // Variável global para saber se estamos criando ou editando
+
+        // Função de Renderizar a Lista (reutilizável)
+        function renderizarLista(colecao) {
+            const lista = document.getElementById('lista');
+            lista.innerHTML = '';
+            colecao.forEach(m => {
+                lista.innerHTML += `
+                <li>
+                    <span><strong>[ID: ${m.id}]</strong> ${m.titulo} (Vol. ${m.volume}) - ${m.editora}</span>
+                    <div>
+                        <button class="btn-acao btn-editar" onclick="prepararEdicao(${m.id}, '${m.titulo}', ${m.volume}, '${m.editora}')">✏️</button>
+                        <button class="btn-acao btn-excluir" onclick="excluir(${m.id})">❌</button>
+                    </div>
+                </li>`;
+            });
+        }
+
+        async function listar() {
+            document.getElementById('campoBusca').value = '';
+            const res = await fetch('/mangas');
+            const data = await res.json();
+            renderizarLista(data.colecao);
+        }
+
+        async function buscar() {
+            const termo = document.getElementById('campoBusca').value;
+            if (!termo) return listar();
+            
+            const res = await fetch(`/mangas/buscar?termo=${termo}`);
+            const data = await res.json();
+            renderizarLista(data.colecao);
+        }
+
+        // Prepara o formulário para edição
+        function prepararEdicao(id, titulo, volume, editora) {
+            document.getElementById('tituloForm').innerText = "Editando Mangá [ID: " + id + "]";
+            document.getElementById('titulo').value = titulo;
+            document.getElementById('volume').value = volume;
+            document.getElementById('editora').value = editora;
+            
+            editandoId = id; // Trava o sistema no modo edição
+            document.getElementById('btnSalvar').innerText = "Salvar Alterações";
+            document.getElementById('btnSalvar').style.background = "#f39c12";
+        }
+
+        async function salvarDados() {
+            const titulo = document.getElementById('titulo').value;
+            const volume = document.getElementById('volume').value;
+            const editora = document.getElementById('editora').value;
+            
+            if (!titulo || !volume) return alert("Título e Volume são obrigatórios!");
+
+            if (editandoId) {
+                // Se tem um ID na variável, faz UPDATE (PUT)
+                await fetch(`/mangas/${editandoId}?titulo=${titulo}&volume=${volume}&editora=${editora}`, { method: 'PUT' });
+                alert("Mangá editado com sucesso!");
+            } else {
+                // Se não tem ID, faz CADASTRO (POST)
+                const res = await fetch(`/mangas?titulo=${titulo}&volume=${volume}&editora=${editora}`, { method: 'POST' });
+                if (!res.ok) return alert("Erro: Volume já cadastrado!");
+            }
+            
+            // Limpa o formulário e reseta para modo Cadastro
+            document.getElementById('titulo').value = '';
+            document.getElementById('volume').value = '';
+            document.getElementById('editora').value = '';
+            document.getElementById('tituloForm').innerText = "Novo Mangá";
+            document.getElementById('btnSalvar').innerText = "Cadastrar Mangá";
+            document.getElementById('btnSalvar').style.background = "#6200ee";
+            editandoId = null; 
+            
+            listar();
+        }
+
+        async function excluir(id) {
+            if(confirm("Tem certeza que deseja excluir o mangá ID " + id + "?")) {
+                await fetch(`/mangas/${id}`, { method: 'DELETE' });
+                listar();
+            }
+        }
+
+        listar();
+    </script>
+</body>
+</html>
